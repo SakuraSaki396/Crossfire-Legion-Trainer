@@ -6,7 +6,7 @@
 > ⚠️ **只在单人 / 离线 AI 遭遇战 / 战役里用。** 联机对局请勿开启；此类工具通常违反游戏服务条款，风险自负。
 > 本仓库不包含任何游戏文件，使用时需要你自备正版游戏。
 
-<img width="640" height="622" alt="image" src="https://github.com/user-attachments/assets/51630423-3b2c-4f35-a078-135fd91a2266" />
+<img width="672" height="647" alt="installer" src="https://github.com/user-attachments/assets/d31e9aa4-bc38-45a6-8763-45b2e9daf2ca" />
 
 ## 功能
 
@@ -39,7 +39,7 @@
 「游戏版本」卡片会读取游戏 exe 的 `ProductVersion` 与 Steam `buildid`，与验证过的版本比对，并对 8 项功能逐个自检；
 右上角 **「适配说明…」** 会弹出完整说明：适配的是哪个版本、版本对不上时**哪些功能会先失效**、日志里搜什么、更新后怎么办。
 
-![适配说明](docs/compat-note.png)
+<img width="712" height="615" alt="compat-note" src="https://github.com/user-attachments/assets/b456bb1f-b4d8-4f1a-bc52-aa54d1fd9df0" />
 
 这份说明只存在于 exe 内部，不会往游戏目录写任何说明文件。
 

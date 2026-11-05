@@ -1,0 +1,51 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Single source of truth for the version: ..\version.txt (also read by CrossfireTrainer.csproj) -->
+  <PropertyGroup>
+    <VersionFile>$(MSBuildThisFileDirectory)..\version.txt</VersionFile>
+    <TrainerVersion Condition="Exists('$(VersionFile)')">$([System.IO.File]::ReadAllText('$(VersionFile)').Trim())</TrainerVersion>
+    <TrainerVersion Condition="'$(TrainerVersion)' == ''">0.0.0</TrainerVersion>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <AssemblyName>CrossfireTrainerSetup</AssemblyName>
+    <RootNamespace>TrainerSetup</RootNamespace>
+    <LangVersion>7.3</LangVersion>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>icon.ico</ApplicationIcon>
+
+    <Version>$(TrainerVersion)</Version>
+    <FileVersion>$(TrainerVersion).0</FileVersion>
+    <InformationalVersion>$(TrainerVersion)</InformationalVersion>
+    <Product>Crossfire Legion 修改器 v$(TrainerVersion)</Product>
+    <AssemblyTitle>Crossfire Legion 修改器 v$(TrainerVersion)</AssemblyTitle>
+    <Company>Trainer</Company>
+    <Description>Crossfire Legion 单人/遭遇战修改器安装器</Description>
+    <Copyright>For single-player use only</Copyright>
+
+    <DebugType>none</DebugType>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <AssemblyMetadata Include="TrainerVersion" Value="$(TrainerVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.IO.Compression.FileSystem" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="payload.zip" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+
+</Project>

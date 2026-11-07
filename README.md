@@ -87,67 +87,6 @@ build_setup.bat
 所以第一次构建前，游戏目录里需要已经有一份 BepInEx 5.4.23.2（x64）——
 先跑一次已发布的安装器，或按 BepInEx 官方文档自行安装即可。
 
-### 改版本号
-
-版本只有一个来源：仓库根目录的 `version.txt`。两个 `csproj` 都把它读作 `<Version>`，
-插件编译时还会生成 `BuildInfo.Version` 常量供 `[BepInPlugin]` 和面板标签使用，
-`stamp_version.py` 会同步 `zzz_trainer.lua`，`export_exe.py` 按它命名 exe 并清掉旧版本文件。
-所以 exe 文件名、exe 属性、安装器标题、游戏内面板右上角的版本标签永远一致。
-
-## 目录结构
-
-```
-.
-├─ .gitignore                 排除编译产物 / payload / 发布包 / 反编译源码
-├─ .gitattributes             换行符规则（.bat 固定 CRLF）
-├─ LICENSE                    专有许可（仅限本人使用，禁止传播/修改/出售/再授权）
-├─ THIRD-PARTY-NOTICES.md     第三方组件与游戏资产声明
-├─ README.md                  本文件
-├─ version.txt                版本号唯一来源（两个工程共用）
-├─ docs/                      README 里用到的截图
-├─ CrossfireTrainer/          插件本体（CrossfireTrainer.dll + zzz_trainer.lua）
-│  ├─ Plugin.cs               入口、热键、Lua 桥、每帧驱动
-│  ├─ Hud.cs                  Canvas 面板（功能行、状态方块、速度滑条）
-│  ├─ Patches.cs              Harmony 补丁，挂到 SimScriptProcessor.OnInitialize
-│  ├─ zzz_trainer.lua         作弊逻辑本体（必须纯 ASCII）
-│  ├─ stamp_version.py        同步 lua 的版本行
-│  └─ build.bat               编译 + 部署
-├─ TrainerSetup/              单文件安装器（WinForms, net48）
-│  ├─ SetupForm.cs            界面
-│  ├─ Installer.cs            解压内嵌 payload、校验、卸载
-│  ├─ GameVersion.cs          版本探测 + 适配说明全文
-│  ├─ SteamFinder.cs          注册表 / libraryfolders.vdf 找 Steam 库
-│  ├─ Program.cs              入口 + 命令行模式
-│  ├─ pack_payload.py         从游戏目录收集 24 个文件打 payload.zip
-│  └─ export_exe.py           按 version.txt 导出 "Crossfire Legion 修改器 vX.Y.Z.exe"
-└─ tools/                     开发期辅助工具，不参与游戏运行，可整目录删除
-   ├─ focus.py / capture.py   窗口置前 + 截图（自动化验证用）
-   ├─ click.py / drag.py / key.py   模拟点击、拖动、按键
-   ├─ shot_setup.py           重新生成 docs/ 里的两张截图
-   ├─ test_trainer_lua.py     用 lupa 跑 zzz_trainer.lua 单测（mock 全写在 Lua 里）
-   ├─ dumpstr.py              从 Carbon.Simulation.dll 提取未公开接口名
-   └─ ProbePlugin/            探针插件，确认引擎接口在目标版本里仍然存在
-```
-
-## 上传到 GitHub
-
-仓库只放源码。`.gitignore` 已经排掉 `bin/`、`obj/`、`TrainerSetup/payload/`、发布包、
-`tools/dec/`（反编译的引擎源码）和调试截图，所以 `git add .` 之后只有 37 个文件、约 0.4 MB。
-
-```bash
-git add .
-git commit -m "v1.16.1"
-git branch -M main
-git remote add origin https://github.com/<用户名>/<仓库名>.git
-git push -u origin main
-```
-
-安装器 exe 不提交，走 Releases：在仓库里打 tag `v1.16.1`，上传
-`Crossfire Legion 修改器 v1.16.1.exe`，并把 `THIRD-PARTY-NOTICES.md` 一起附上。
-
-> `version.txt` 必须留在根目录：两个 `.csproj` 都用 `..\version.txt` 读版本号，
-> 挪进子目录会让构建直接失败。
-
 ## 实现原理
 
 1. **注入**：BepInEx 5.4（Mono + winhttp / Doorstop），插件随游戏启动加载。

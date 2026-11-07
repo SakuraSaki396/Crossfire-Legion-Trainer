@@ -24,6 +24,8 @@
 | 全图视野 | 调引擎未公开的 `utilities.ToggleFogOfWar(false, player)` 关掉战争迷雾，整张地图（含小地图）直接可见；再点一次恢复 |
 | 移动速度翻倍 | 官方 buff `ba_mod_speed_200pc`（`MoverAttributes.MaximumSpeed`，乘法 ×2），我方每个单位各自翻倍、兵种之间原有快慢关系不变；新造单位 0.5 秒内自动补上，关闭后摘除 |
 | 一键200人口 | 官方 buff `ba_pop_increase_200`（把 `Inventories[ia_population].Maximum` 覆盖成 200）；人口是挂在指挥官实体上的库存，所以只对有我方 `ia_population` 的实体生效，敌方不受影响 |
+| 经验值直接编辑（≤5万） | 点面板上的「经验 N」栏弹出数字键盘，**会预填你当前的数值**，改完点「确定修改」直接把余额**替换**成新值（不是累加）；右侧「设为 5 万」可一键拉满。范围 0 - 50000，输入超过按 50000 处理，**大厅里就能用，不用打局**。经验值存在统计项 `isa_progressionxp_possesion_current`（`onlinedatacache\playerstats.json` 里那条，打一局胜利 +50）。游戏每次完成统计请求都会用缓存快照整体重建内存数据，直接改那条会被抹回 0，所以改由插件自己的余额账户托管：叠加到卡牌界面读取的 `ProgressionTotal` 上，升级扣费时对等扣减，余额存在 `BepInEx\config\CrossfireTrainer.xp.txt`，重启游戏不清零；面板底部实时显示当前持有量 |
+| 卡牌全部升到20级 | 卡牌等级不是独立字段，而是**由每张卡的经验统计值对照兵种进阶表算出来的**（`rpfa_infantry` 12707 / `rpfa_air`·`rpfa_vehicle`·`rpfa_commander` 19061，共 20 档）。按钮把档案里所有卡的 `ProgressionXP` 统计一次性推到 19061，再走游戏自己的 `IStatisticsService.UpdatePlayerStats` 写入（同一路径会 `CachePlayerStats()` 落盘并触发 `OnPlayerStatisticsUpdated`），所以点完当场全部 20 级、不用重启。需要先打开一次卡牌界面，让插件拿到 stat-id → 卡牌的映射 |
 | 我方自动判定 | 用 `utilities.IsLocalPlayer` 找本地玩家所在槽位，与排在第几号位无关；状态栏显示 `P6` 这类结果，`P1*` 表示退回兜底 |
 
 > **只有一个快捷键：`F4` 显示 / 隐藏面板。**
@@ -41,7 +43,7 @@
 
 ### 适配说明就在 exe 里
 
-「游戏版本」卡片会读取游戏 exe 的 `ProductVersion` 与 Steam `buildid`，与验证过的版本比对，并对 12 项功能逐个自检；
+「游戏版本」卡片会读取游戏 exe 的 `ProductVersion` 与 Steam `buildid`，与验证过的版本比对，并对 14 项功能逐个自检；
 右上角 **「适配说明…」** 会弹出完整说明：适配的是哪个版本、版本对不上时**哪些功能会先失效**、日志里搜什么、更新后怎么办。
 
 ![适配说明](docs/compat-note.png)
@@ -51,12 +53,12 @@
 命令行模式（排查问题用）：
 
 ```
-"Crossfire Legion 修改器 v1.13.2.exe" --detect            只检测并打印游戏路径
-"Crossfire Legion 修改器 v1.13.2.exe" --status            安装状态 + 版本判定
-"Crossfire Legion 修改器 v1.13.2.exe" --compat            打印完整适配说明
-"Crossfire Legion 修改器 v1.13.2.exe" --version           修改器版本与目标游戏版本
-"Crossfire Legion 修改器 v1.13.2.exe" --install [目录]    静默安装
-"Crossfire Legion 修改器 v1.13.2.exe" --uninstall [目录]  静默卸载
+"Crossfire Legion 修改器 v1.16.1.exe" --detect            只检测并打印游戏路径
+"Crossfire Legion 修改器 v1.16.1.exe" --status            安装状态 + 版本判定
+"Crossfire Legion 修改器 v1.16.1.exe" --compat            打印完整适配说明
+"Crossfire Legion 修改器 v1.16.1.exe" --version           修改器版本与目标游戏版本
+"Crossfire Legion 修改器 v1.16.1.exe" --install [目录]    静默安装
+"Crossfire Legion 修改器 v1.16.1.exe" --uninstall [目录]  静默卸载
 ```
 
 日志写在 `%TEMP%\CrossfireTrainerSetup.log`。
@@ -98,7 +100,7 @@ build_setup.bat
 .
 ├─ .gitignore                 排除编译产物 / payload / 发布包 / 反编译源码
 ├─ .gitattributes             换行符规则（.bat 固定 CRLF）
-├─ LICENSE                    MIT
+├─ LICENSE                    专有许可（仅限本人使用，禁止传播/修改/出售/再授权）
 ├─ THIRD-PARTY-NOTICES.md     第三方组件与游戏资产声明
 ├─ README.md                  本文件
 ├─ version.txt                版本号唯一来源（两个工程共用）
@@ -134,14 +136,14 @@ build_setup.bat
 
 ```bash
 git add .
-git commit -m "v1.13.2"
+git commit -m "v1.16.1"
 git branch -M main
 git remote add origin https://github.com/<用户名>/<仓库名>.git
 git push -u origin main
 ```
 
-安装器 exe 不提交，走 Releases：在仓库里打 tag `v1.13.2`，上传
-`Crossfire Legion 修改器 v1.13.2.exe`，并把 `THIRD-PARTY-NOTICES.md` 一起附上。
+安装器 exe 不提交，走 Releases：在仓库里打 tag `v1.16.1`，上传
+`Crossfire Legion 修改器 v1.16.1.exe`，并把 `THIRD-PARTY-NOTICES.md` 一起附上。
 
 > `version.txt` 必须留在根目录：两个 `.csproj` 都用 `..\version.txt` 读版本号，
 > 挪进子目录会让构建直接失败。
@@ -183,6 +185,11 @@ Steam「验证文件完整性」也能恢复 Lua 部分。
 
 ## 许可
 
-本仓库代码以 [MIT](LICENSE) 发布。安装器内嵌的 BepInEx / Doorstop / HarmonyX / MonoMod / Mono.Cecil
+本软件**仅供交流与学习**，为改善软件功能、提升用户体验等合法目的而制作。
+本软件为**专有软件，保留所有权利**（见 [LICENSE](LICENSE)）。仅授权取得本软件的本人用于个人、非商业用途；
+**禁止私自传播、修改、出售、再授权**，也禁止反编译、逆向工程、移除版权标识，或以任何形式打包进其他项目与合集。
+完整条款见 [LICENSE](LICENSE)。
+
+安装器内嵌的 BepInEx / Doorstop / HarmonyX / MonoMod / Mono.Cecil
 遵循各自的许可，详见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。
 游戏本体与游戏资源版权归其开发商 / 发行商所有。

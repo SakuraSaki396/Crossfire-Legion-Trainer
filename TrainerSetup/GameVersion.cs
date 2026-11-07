@@ -183,6 +183,14 @@ namespace TrainerSetup
                 new string[0],
                 new[] { "ToggleFogOfWar" }, assets, apis));
 
+            p.Features.Add(Make("移动速度翻倍", "面板",
+                new[] { "Attributes/BuffAttributes/ba_mod_speed_200pc.txt" },
+                new[] { "ModifyBuff", "GetAllAliveEntities" }, assets, apis));
+
+            p.Features.Add(Make("一键200人口", "面板",
+                new[] { "Attributes/BuffAttributes/Population/ba_pop_increase_200.txt", "Attributes/InventoryAttributes/ia_population.txt" },
+                new[] { "ModifyBuff", "HasInventoryOfType" }, assets, apis));
+
             p.Features.Add(Make("我方自动判定", "状态栏",
                 new string[0],
                 new[] { "IsLocalPlayer" }, assets, apis));
@@ -367,6 +375,8 @@ namespace TrainerSetup
             sb.AppendLine("      · ba_max_attack              → 攻击力不变");
             sb.AppendLine("      · ia_resource3               → 指挥官能量不回复");
             sb.AppendLine("      · ia_mana                    → 兵种能量不回复（紫条）");
+            sb.AppendLine("      · ba_mod_speed_200pc         → 移动速度不翻倍");
+            sb.AppendLine("      · ba_pop_increase_200 / ia_population → 人口上限不变");
             sb.AppendLine("      表现：日志出现 \"assets missing: mat=... dmg=...\"。");
             sb.AppendLine();
             sb.AppendLine("   4) 引擎脚本接口被移除或改名（Carbon.Simulation.dll）");

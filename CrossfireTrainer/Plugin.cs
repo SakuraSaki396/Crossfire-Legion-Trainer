@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Reflection;
 using BepInEx;
 using BepInEx.Logging;
 using Carbon.Scripting.Lua;
@@ -20,6 +21,8 @@ namespace CrossfireTrainer
         public bool Mana;          // unit energy (purple bar) pinned to max
         public bool UnitCd;        // ability cooldowns cleared for the whole army
         public bool Vision;        // fog of war off
+        public bool MoveSpeed;     // friendly units at x2 movement speed
+        public bool PopCap;        // population cap raised past the skirmish limit
         public float Speed = 1f;
         public int Amount = 200000;
 
@@ -33,6 +36,8 @@ namespace CrossfireTrainer
             Mana = false;
             UnitCd = false;
             Vision = false;
+            MoveSpeed = false;
+            PopCap = false;
             Speed = 1f;
         }
     }
@@ -41,6 +46,14 @@ namespace CrossfireTrainer
     public class TrainerPlugin : BaseUnityPlugin
     {
         public const string Guid = "roger.crossfirelegion.trainer";
+
+        /// <summary>
+        /// Damage the "super attack" toggle applies. The shipped buff asset
+        /// (ba_max_attack) carries 1,000,000, which is well past anything a unit
+        /// needs and makes every damage number in the UI meaningless; the asset is
+        /// retuned to this value once per session instead.
+        /// </summary>
+        internal const int DamageAmount = 1000;
 
         internal static TrainerPlugin Instance;
         internal static ManualLogSource Log;
@@ -68,6 +81,7 @@ namespace CrossfireTrainer
         private string _lastLuaMsg = "";
         private int _luaMsgWarned;
         private readonly System.Diagnostics.Stopwatch _tickWatch = System.Diagnostics.Stopwatch.StartNew();
+        private readonly System.Diagnostics.Stopwatch _fastWatch = new System.Diagnostics.Stopwatch();
         private long _lastTickMs;
 
         private LuaClosure _tickClosure;
@@ -84,11 +98,23 @@ namespace CrossfireTrainer
         // one of the army features is broken on this build.
         private int _tickFaults;
 
+        // Set when the Lua side never finished loading (Trainer exists but has no
+        // functions). Nothing it is asked to do can work in that state, so every
+        // later command is dropped instead of being retried: a retry loop here is
+        // what once turned one broken script into 1.9 GB of log and a 12 s stall.
+        private bool _luaBroken;
+        private int _luaFaultLogged;
+        private int _cmdDropped;
+
         // profiling
         private int _tickCount;
         private double _tickSumMs;
         private double _tickMaxMs;
         private int _lastHitchFrame = -1;
+        private double _frameMsSum;
+        private int _frameCount;
+        private float _fpsReportAt;
+        private int _gc0, _gc1, _gc2;
 
         private void Awake()
         {
@@ -130,9 +156,19 @@ namespace CrossfireTrainer
         // ------------------------------------------------------------------
         // Lua bridge
         // ------------------------------------------------------------------
+        /// <summary>Drains without executing (ConcurrentQueue has no Clear on this runtime).</summary>
+        private void ClearQueue()
+        {
+            while (Queue.TryDequeue(out _)) { }
+        }
+
         internal void Enqueue(string luaCode)
         {
             if (string.IsNullOrEmpty(luaCode)) return;
+            if (_luaBroken) { _cmdDropped++; return; }
+            // Backpressure: a handler that feeds the queue faster than it drains must
+            // not be able to grow it without bound.
+            if (Queue.Count > 256) { _cmdDropped++; return; }
             Queue.Enqueue(luaCode);
         }
 
@@ -159,10 +195,16 @@ namespace CrossfireTrainer
         /// <summary>Drains the queue; called from the simulation thread only.</summary>
         internal void Drain()
         {
+            if (_luaBroken) { ClearQueue(); return; }
             if (Lua == null) return;
 
             bool ran = false;
-            while (Queue.TryDequeue(out var code))
+            // Bounded drain. A fault handler can queue a follow-up command, and an
+            // unbounded while-loop then never leaves this frame: the simulation thread
+            // stalls, every unit stops moving and the whole match freezes. Whatever is
+            // left over simply runs on the next tick.
+            int budget = 64;
+            while (budget-- > 0 && Queue.TryDequeue(out var code))
             {
                 ran = true;
                 ExecuteLua(code);
@@ -218,7 +260,11 @@ namespace CrossfireTrainer
                 if (now - _lastFastMs >= 100)
                 {
                     _lastFastMs = now;
+                    _fastWatch.Restart();
                     RunCached(ref _fastClosure, "if Trainer then Trainer.FastTick() end", "TrainerFastTick");
+                    _fastWatch.Stop();
+                    double fms = _fastWatch.Elapsed.TotalMilliseconds;
+                    if (fms > 5.0) Log.LogWarning($"[PERF] slow fast tick {fms:0.0} ms");
                 }
             }
 
@@ -264,7 +310,7 @@ namespace CrossfireTrainer
         /// <summary>Parses <paramref name="code"/> once and reuses the closure until it dies.</summary>
         private void RunCached(ref LuaClosure closure, string code, string token)
         {
-            if (Lua == null) return;
+            if (Lua == null || _luaBroken) return;
 
             if (closure == null || !closure.IsValid)
             {
@@ -286,20 +332,65 @@ namespace CrossfireTrainer
             }
             catch (Exception e)
             {
-                Log.LogWarning("Trainer " + token + ": " + e.Message);
                 try { Lua.DisposeLuaClosure(closure.ClosureId); } catch { }
                 closure = null;
+
+                if (IsScriptMissing(e.Message))
+                {
+                    TripLuaBreaker(e.Message);
+                    return;
+                }
+
+                if (_luaFaultLogged < 5)
+                {
+                    _luaFaultLogged++;
+                    Log.LogWarning("Trainer " + token + ": " + e.Message);
+                }
                 OnTickFault();
             }
         }
 
         /// <summary>
-        /// A repeatable Lua fault is not fatal: the closure is disposed and re-parsed on
-        /// the next tick, and the game keeps running. Three in a row, however, means one
-        /// of the per-entity features is broken on this build, so stop it instead of
-        /// failing forever. Whatever the cause, other features (vision in particular)
-        /// must keep working -- they share nothing but this driver.
+        /// True when the Lua side is a stub: the table is there but the functions are
+        /// not, which is what a chunk that aborted half-way through leaves behind.
         /// </summary>
+        private static bool IsScriptMissing(string message)
+        {
+            if (string.IsNullOrEmpty(message)) return false;
+            if (message.IndexOf("attempt to call a nil value", System.StringComparison.Ordinal) < 0) return false;
+            return message.IndexOf("field 'Set'", System.StringComparison.Ordinal) >= 0
+                || message.IndexOf("field 'Tick'", System.StringComparison.Ordinal) >= 0
+                || message.IndexOf("field 'Compat'", System.StringComparison.Ordinal) >= 0
+                || message.IndexOf("field 'FastTick'", System.StringComparison.Ordinal) >= 0;
+        }
+
+        /// <summary>
+        /// One-way latch: from here on no Lua command is queued at all, the pending
+        /// ones are dropped and the panel switches back to "off". A broken script is
+        /// reported once; it must never turn into a per-frame retry loop.
+        /// </summary>
+        internal void TripLuaBreaker(string reason)
+        {
+            if (_luaBroken) return;
+            _luaBroken = true;
+
+            ClearQueue();
+            State.Resources = false;
+            State.God = false;
+            State.Build = false;
+            State.Damage = false;
+            State.SkillEnergy = false;
+            State.Mana = false;
+            State.UnitCd = false;
+            State.Vision = false;
+            State.MoveSpeed = false;
+            State.PopCap = false;
+
+            Log.LogError("Trainer: lua script is not usable for this match, all features disabled -> " + reason);
+            PendingToast = "脚本未加载成功，功能已全部关闭";
+        }
+
+        /// <summary>Repeating tick faults: stop the expensive per-entity features.</summary>
         private void OnTickFault()
         {
             _tickFaults++;
@@ -357,8 +448,28 @@ namespace CrossfireTrainer
                 case "energy": return "指挥官能量无限";
                 case "mana": return "兵种能量无限";
                 case "unitcd": return "技能无冷却";
+                case "movespeed": return "移动速度翻倍";
+                case "popcap": return "一键200人口";
                 case "speed": return "游戏速度";
                 default: return key;
+            }
+        }
+
+        private bool IsFeatureOn(string key)
+        {
+            switch (key)
+            {
+                case "resources": return State.Resources;
+                case "god": return State.God;
+                case "build": return State.Build;
+                case "damage": return State.Damage;
+                case "energy": return State.SkillEnergy;
+                case "mana": return State.Mana;
+                case "unitcd": return State.UnitCd;
+                case "vision": return State.Vision;
+                case "movespeed": return State.MoveSpeed;
+                case "popcap": return State.PopCap;
+                default: return false;
             }
         }
 
@@ -369,6 +480,11 @@ namespace CrossfireTrainer
         /// </summary>
         internal void DisableFeature(string key)
         {
+            // Already off means there is nothing to undo. Without this the off command
+            // is queued again, faults again, and calls back into here -- an endless
+            // queue/execute loop that floods the log file and stalls the game.
+            if (!IsFeatureOn(key)) return;
+
             switch (key)
             {
                 case "resources": State.Resources = false; break;
@@ -378,6 +494,8 @@ namespace CrossfireTrainer
                 case "energy": State.SkillEnergy = false; break;
                 case "mana": State.Mana = false; break;
                 case "unitcd": State.UnitCd = false; break;
+                case "movespeed": State.MoveSpeed = false; break;
+                case "popcap": State.PopCap = false; break;
                 default: return;
             }
 
@@ -388,6 +506,7 @@ namespace CrossfireTrainer
 
         private void ExecuteLua(string code)
         {
+            if (Lua == null) return;
             LuaClosure closure = null;
             try
             {
@@ -398,7 +517,21 @@ namespace CrossfireTrainer
             }
             catch (Exception e)
             {
-                Log.LogWarning("Trainer lua: " + e.Message + "  [" + code + "]");
+                // "attempt to call a nil value (field 'Set')" is not a feature fault:
+                // it means Trainer exists but the script never finished loading, so
+                // retrying (or turning features off one by one) can only make things
+                // worse. Trip the breaker once and stay quiet afterwards.
+                if (IsScriptMissing(e.Message))
+                {
+                    TripLuaBreaker(e.Message);
+                    return;
+                }
+
+                if (_luaFaultLogged < 5)
+                {
+                    _luaFaultLogged++;
+                    Log.LogWarning("Trainer lua: " + e.Message + "  [" + code + "]");
+                }
                 RecoverFromLuaFault(FeatureKeyOf(code));
             }
             finally
@@ -413,32 +546,90 @@ namespace CrossfireTrainer
         // ------------------------------------------------------------------
         // session hooks
         // ------------------------------------------------------------------
+        /// <summary>
+        /// Retunes the damage buff asset from the shipped 1,000,000 down to
+        /// <see cref="DamageAmount"/>. The value lives on a plain asset object
+        /// (Value + the IntValue cache filled in by its OnLoad), so this is a
+        /// property write instead of shipping a patched Attributes.zip. Only the
+        /// asset the trainer itself uses is touched, and it is touched once.
+        /// </summary>
+        private void RetuneDamageAsset(SimScriptProcessor processor)
+        {
+            const string assetName = "ba_max_attack";
+            try
+            {
+                var field = typeof(SimScriptProcessor).GetField("mAttributeDatabase",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                var db = field?.GetValue(processor) as Carbon.Attributes.IAttributeDatabase;
+                if (db == null)
+                {
+                    Log.LogWarning("Trainer: attribute database not reachable, damage stays 1000000");
+                    return;
+                }
+
+                var asset = db.GetObject(assetName) as Carbon.Simulation.Data.BuffAttributes;
+                if (asset == null)
+                {
+                    Log.LogWarning($"Trainer: {assetName} not found, damage stays 1000000");
+                    return;
+                }
+
+                asset.Value = Carbon.Core.Numerics.Q64.Real.FromInt(DamageAmount);
+                asset.IntValue = DamageAmount;      // cached in OnLoad, used by int attributes
+                Log.LogInfo($"Trainer: damage asset {assetName} = {DamageAmount}");
+            }
+            catch (Exception e)
+            {
+                Log.LogWarning($"Trainer: damage retune failed -> {e.Message}");
+            }
+        }
+
         internal void OnSessionStart(SimScriptProcessor processor)
         {
             Lua = PatchOnInitialize.LuaField(processor);
             Sim = PatchOnInitialize.FrameCtrl(processor) as SimController;
 
+            RetuneDamageAsset(processor);
+
             Log.LogInfo($"Trainer: session start (lua={(Lua != null)}, sim={(Sim != null)})");
             _lastLuaMsg = "";
             _compatLogged = false;
             _visionBroken = false;
+            _luaBroken = false;
+            _luaFaultLogged = 0;
+            _cmdDropped = 0;
             PlayerTag = "";
+            _frameMsSum = 0.0;
+            _frameCount = 0;
+            _fpsReportAt = 0f;
 
+            // A stub table still carries .version (it is assigned near the top of the
+            // script), so "version is readable" does not mean "the script loaded".
+            // Only loadedFlag is written after the last statement of the chunk.
             string ver = TryGetLuaString("Trainer.version");
-            if (string.IsNullOrEmpty(ver))
+            if (TryGetLuaString("Trainer.loadedFlag") != "ok")
             {
-                Log.LogInfo("Trainer: engine did not load the script, loading it from disk...");
-                LoadTrainerScript();
+                Log.LogWarning("Trainer: lua script did not finish loading (version=" +
+                               (string.IsNullOrEmpty(ver) ? "<none>" : ver) +
+                               "), reloading from disk to surface the real error");
+                ExecuteLua("Trainer = nil");     // drop whatever half-built table exists
+                LoadTrainerScript();             // a fault here is reported with its message
                 ver = TryGetLuaString("Trainer.version");
             }
+
+            bool loadedOk = TryGetLuaString("Trainer.loadedFlag") == "ok";
             Log.LogInfo("Trainer: lua script = " + (string.IsNullOrEmpty(ver) ? "<NOT LOADED>" : "v" + ver));
 
             // Say which engine interfaces this build still has, so a game patch shows up
             // in the log instead of a feature silently doing nothing.
-            if (string.IsNullOrEmpty(ver))
-                Log.LogWarning("Trainer: compat probe skipped, lua side not loaded");
-            else
-                RunLua("Trainer.Compat()");
+            if (!loadedOk)
+            {
+                TripLuaBreaker("script aborted while loading");
+                _applySpeedNextFrame = true;   // still restore x1 in case it was changed
+                return;
+            }
+
+            RunLua("Trainer.Compat()");
 
             // Re-apply whatever was toggled before, the new Lua env is fresh.
             if (State.Resources) SetFeature("resources", true);
@@ -449,6 +640,8 @@ namespace CrossfireTrainer
             if (State.Mana) SetFeature("mana", true);
             if (State.UnitCd) SetFeature("unitcd", true);
             if (State.Vision) SetFeature("vision", true);
+            if (State.MoveSpeed) SetFeature("movespeed", true);
+            if (State.PopCap) SetFeature("popcap", true);
             PushAmount();
             PushSpeed();
             // Time.timeScale must be touched from the Unity main thread.
@@ -544,10 +737,53 @@ namespace CrossfireTrainer
             if (!InMatch) return;
 
             float dt = Time.unscaledDeltaTime;
+            // A once-per-30 s frame-rate line: "the game feels slow" is otherwise
+            // impossible to confirm or deny from the log, because hitches alone say
+            // nothing about the steady state. The window start is anchored on the first
+            // frame after the match begins -- leaving it at 0 made the very first report
+            // cover a single frame and print a meaningless average.
+            if (_fpsReportAt <= 0f) _fpsReportAt = Time.unscaledTime;
+            _frameMsSum += dt;
+            _frameCount++;
+            if (Time.unscaledTime - _fpsReportAt >= 30f && _frameCount > 0)
+            {
+                double avg = _frameMsSum * 1000.0 / _frameCount;
+                Log.LogInfo($"[PERF] fps {1000.0 / avg:0.0}  ({avg:0.0} ms/frame over {_frameCount} frames)" +
+                            $"  gc {GC.CollectionCount(0)}/{GC.CollectionCount(1)}/{GC.CollectionCount(2)}  on: {ActiveFeatures()}");
+                _frameMsSum = 0.0;
+                _frameCount = 0;
+                _fpsReportAt = Time.unscaledTime;
+            }
+
             if (dt < 0.15f) return;
             if (Time.frameCount - _lastHitchFrame < 2) return;   // one event per stall
             _lastHitchFrame = Time.frameCount;
-            Log.LogWarning($"[HITCH] {dt * 1000f:0} ms  @ {Time.unscaledTime:0.0}s");
+
+            // Which features were on matters: a stall with everything off is the
+            // game, a stall that only happens with one toggle on is the trainer.
+            // The GC counters say whether the stall was a stop-the-world collection
+            // (very common in Unity/Mono) instead of a slow frame of our own making.
+            int g0 = GC.CollectionCount(0), g1 = GC.CollectionCount(1), g2 = GC.CollectionCount(2);
+            Log.LogWarning($"[HITCH] {dt * 1000f:0} ms  @ {Time.unscaledTime:0.0}s  on: {ActiveFeatures()}  gc +{g0 - _gc0}/+{g1 - _gc1}/+{g2 - _gc2}");
+            _gc0 = g0; _gc1 = g1; _gc2 = g2;
+        }
+
+        private string ActiveFeatures()
+        {
+            var sb = new System.Text.StringBuilder(32);
+            if (State.Resources) sb.Append("res,");
+            if (State.God) sb.Append("god,");
+            if (State.Build) sb.Append("build,");
+            if (State.Damage) sb.Append("dmg,");
+            if (State.SkillEnergy) sb.Append("energy,");
+            if (State.Mana) sb.Append("mana,");
+            if (State.UnitCd) sb.Append("unitcd,");
+            if (State.Vision) sb.Append("vision,");
+            if (State.MoveSpeed) sb.Append("speed,");
+            if (State.PopCap) sb.Append("pop,");
+            if (sb.Length == 0) return "none";
+            sb.Length--;                       // drop the trailing comma
+            return sb.ToString();
         }
 
         private void EnforceSpeed()
@@ -620,6 +856,16 @@ namespace CrossfireTrainer
                     State.UnitCd = !State.UnitCd;
                     SetFeature(key, State.UnitCd);
                     ShowToast(label + (State.UnitCd ? " 开" : " 关"));
+                    break;
+                case "movespeed":
+                    State.MoveSpeed = !State.MoveSpeed;
+                    SetFeature(key, State.MoveSpeed);
+                    ShowToast(label + (State.MoveSpeed ? " 开" : " 关"));
+                    break;
+                case "popcap":
+                    State.PopCap = !State.PopCap;
+                    SetFeature(key, State.PopCap);
+                    ShowToast(label + (State.PopCap ? " 开" : " 关"));
                     break;
                 case "vision":
                     if (_visionBroken)

@@ -15,13 +15,15 @@
 | 无限资源 | 每 0.5 秒把材料 / 燃料拉回设定值（10k / 50k / 200k / 999k 可切） |
 | 友方无敌 / 锁血 | 对全部友方实体设 `IgnoreRemove` 交易模式，伤害无法扣除 HP / 护盾，每 1.5 秒刷新以覆盖新造单位 |
 | 建造 / 生产加速 | 复用官方 buff `ba_campaign_production_time_fast`（ConstructionRate ×50）与 `ba_Production_set_to_2`（生产 1 秒） |
-| 超级攻击力 | 官方 buff `ba_max_attack`（武器伤害 Amount = 1,000,000） |
+| 超级攻击力 | 官方 buff `ba_max_attack`，进入对局时把它的伤害值从自带的 1,000,000 改成 1,000（够秒任何单位，数值也不至于离谱） |
 | 游戏速度 | 改引擎自己的 `SimController.TimeScale` + `Time.timeScale`，面板上是 0.5×–5× 的拖动滑条 |
 | 立即完成建造 | `utilities.CompleteConstruction` |
 | 指挥官能量无限 | 每 100 ms 读回 `ia_resource3`（上限 100），掉了就补满 |
 | 兵种能量无限 | 兵种技能用的是另一条库存 `ia_mana`（面板上的紫条，每个单位各自一份、上限 100），每 200 ms 对**我方每个实体**写满；引擎按各自上限截断，所以不用管是哪个兵种 |
 | 技能无冷却（含兵种） | 每 200 ms 对**我方每一个实体**（含指挥官本人）调 `utilities.ResetAbilityCooldowns(entity)`，指挥官技能与各兵种的主动技能冷却一起清 |
 | 全图视野 | 调引擎未公开的 `utilities.ToggleFogOfWar(false, player)` 关掉战争迷雾，整张地图（含小地图）直接可见；再点一次恢复 |
+| 移动速度翻倍 | 官方 buff `ba_mod_speed_200pc`（`MoverAttributes.MaximumSpeed`，乘法 ×2），我方每个单位各自翻倍、兵种之间原有快慢关系不变；新造单位 0.5 秒内自动补上，关闭后摘除 |
+| 一键200人口 | 官方 buff `ba_pop_increase_200`（把 `Inventories[ia_population].Maximum` 覆盖成 200）；人口是挂在指挥官实体上的库存，所以只对有我方 `ia_population` 的实体生效，敌方不受影响 |
 | 我方自动判定 | 用 `utilities.IsLocalPlayer` 找本地玩家所在槽位，与排在第几号位无关；状态栏显示 `P6` 这类结果，`P1*` 表示退回兜底 |
 
 > **只有一个快捷键：`F4` 显示 / 隐藏面板。**
@@ -39,7 +41,7 @@
 
 ### 适配说明就在 exe 里
 
-「游戏版本」卡片会读取游戏 exe 的 `ProductVersion` 与 Steam `buildid`，与验证过的版本比对，并对 10 项功能逐个自检；
+「游戏版本」卡片会读取游戏 exe 的 `ProductVersion` 与 Steam `buildid`，与验证过的版本比对，并对 12 项功能逐个自检；
 右上角 **「适配说明…」** 会弹出完整说明：适配的是哪个版本、版本对不上时**哪些功能会先失效**、日志里搜什么、更新后怎么办。
 
 ![适配说明](docs/compat-note.png)
@@ -49,12 +51,12 @@
 命令行模式（排查问题用）：
 
 ```
-"Crossfire Legion 修改器 v1.11.0.exe" --detect            只检测并打印游戏路径
-"Crossfire Legion 修改器 v1.11.0.exe" --status            安装状态 + 版本判定
-"Crossfire Legion 修改器 v1.11.0.exe" --compat            打印完整适配说明
-"Crossfire Legion 修改器 v1.11.0.exe" --version           修改器版本与目标游戏版本
-"Crossfire Legion 修改器 v1.11.0.exe" --install [目录]    静默安装
-"Crossfire Legion 修改器 v1.11.0.exe" --uninstall [目录]  静默卸载
+"Crossfire Legion 修改器 v1.13.2.exe" --detect            只检测并打印游戏路径
+"Crossfire Legion 修改器 v1.13.2.exe" --status            安装状态 + 版本判定
+"Crossfire Legion 修改器 v1.13.2.exe" --compat            打印完整适配说明
+"Crossfire Legion 修改器 v1.13.2.exe" --version           修改器版本与目标游戏版本
+"Crossfire Legion 修改器 v1.13.2.exe" --install [目录]    静默安装
+"Crossfire Legion 修改器 v1.13.2.exe" --uninstall [目录]  静默卸载
 ```
 
 日志写在 `%TEMP%\CrossfireTrainerSetup.log`。
@@ -132,14 +134,14 @@ build_setup.bat
 
 ```bash
 git add .
-git commit -m "v1.11.0"
+git commit -m "v1.13.2"
 git branch -M main
 git remote add origin https://github.com/<用户名>/<仓库名>.git
 git push -u origin main
 ```
 
-安装器 exe 不提交，走 Releases：在仓库里打 tag `v1.11.0`，上传
-`Crossfire Legion 修改器 v1.11.0.exe`，并把 `THIRD-PARTY-NOTICES.md` 一起附上。
+安装器 exe 不提交，走 Releases：在仓库里打 tag `v1.13.2`，上传
+`Crossfire Legion 修改器 v1.13.2.exe`，并把 `THIRD-PARTY-NOTICES.md` 一起附上。
 
 > `version.txt` 必须留在根目录：两个 `.csproj` 都用 `..\version.txt` 读版本号，
 > 挪进子目录会让构建直接失败。

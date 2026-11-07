@@ -215,7 +215,7 @@ namespace TrainerSetup
 
             Controls.Add(new Label
             {
-                Text = "面板  8 个开关 + 速度滑条，全部可以直接用鼠标点（无需快捷键）",
+                Text = "面板  10 个开关 + 速度滑条，全部可以直接用鼠标点（无需快捷键）",
                 ForeColor = Dim,
                 AutoSize = true,
                 Location = new Point(24, 516),

@@ -78,6 +78,12 @@
       <HintPath>$(ManagedDir)\Carbon.Simulation.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <!-- ObjectBase (base of every carbon asset) and the asset database interface
+         live here; needed to retune the damage buff asset at session start. -->
+    <Reference Include="Carbon.Attributes">
+      <HintPath>$(ManagedDir)\Carbon.Attributes.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
     <Reference Include="Carbon.Scripting.Lua">
       <HintPath>$(ManagedDir)\Carbon.Scripting.Lua.dll</HintPath>
       <Private>false</Private>

@@ -17,7 +17,7 @@ namespace CrossfireTrainer
     internal static class Hud
     {
         private const float PanelW = 372f;
-        private const float PanelH = 632f;
+        private const float PanelH = 716f;
 
         // speed slider geometry
         private const float SpeedMin = 0.5f;
@@ -56,6 +56,7 @@ namespace CrossfireTrainer
         private static Text _toast;
         private static Image _toastBg;
         private static Btn _rowRes, _rowGod, _rowBuild, _rowDmg, _rowEnergy, _rowMana, _rowUnitCd, _rowVision;
+        private static Btn _rowMoveSpeed, _rowPopCap;
         private static Btn[] _amounts;
         private static RectTransform _speedTrackRt, _speedFillRt, _speedKnobRt, _speedHit;
         private static bool _sliding;
@@ -69,7 +70,7 @@ namespace CrossfireTrainer
         private static float _lastSpeedVal = -1f;
         private static int _lastAmount = -1;
         private static bool _lastVisible = true;
-        private static readonly bool[] _lastRow = new bool[8];
+        private static readonly bool[] _lastRow = new bool[10];
 
         // ------------------------------------------------------------------
         // construction
@@ -172,25 +173,27 @@ namespace CrossfireTrainer
             _rowMana = Row("Mana", 16f, -280f, "兵种能量无限", "mana");
             _rowUnitCd = Row("UnitCd", 16f, -322f, "技能无冷却（含兵种）", "unitcd");
             _rowVision = Row("Vision", 16f, -364f, "全图视野", "vision");
+            _rowMoveSpeed = Row("MoveSpeed", 16f, -406f, "移动速度翻倍", "movespeed");
+            _rowPopCap = Row("PopCap", 16f, -448f, "一键200人口", "popcap");
 
             // ---- speed (drag slider) ----
-            Txt("SpeedLabel", _panel, 16f, -414f, 120f, 18f, "游戏速度", 13, CText, TextAnchor.MiddleLeft);
-            _speedValue = Txt("SpeedValue", _panel, PanelW - 152f, -414f, 120f, 18f, "x1.0", 13, CAccent, TextAnchor.MiddleRight, true);
+            Txt("SpeedLabel", _panel, 16f, -498f, 120f, 18f, "游戏速度", 13, CText, TextAnchor.MiddleLeft);
+            _speedValue = Txt("SpeedValue", _panel, PanelW - 152f, -498f, 120f, 18f, "x1.0", 13, CAccent, TextAnchor.MiddleRight, true);
 
-            var track = Img("SpeedTrack", _panel, 16f, -442f, TrackW, 6f, CTrack);
+            var track = Img("SpeedTrack", _panel, 16f, -526f, TrackW, 6f, CTrack);
             _speedTrackRt = (RectTransform)track.transform;
             _speedFillRt = (RectTransform)Img("SpeedFill", track.transform, 0f, 0f, 0f, 6f, CAccent).transform;
             _speedKnobRt = (RectTransform)Marker("SpeedKnob", track.transform, 0f, KnobW, CKnob).transform;
 
             // Grab area: taller than the bar itself so it is easy to catch with the mouse.
-            _speedHit = Rect("SpeedHit", _panel, 8f, -433f, PanelW - 16f, 22f);
+            _speedHit = Rect("SpeedHit", _panel, 8f, -517f, PanelW - 16f, 22f);
 
-            Txt("SpeedMin", _panel, 16f, -456f, 60f, 14f, "x0.5", 10, CDim, TextAnchor.MiddleLeft);
-            Txt("SpeedMax", _panel, PanelW - 76f, -456f, 60f, 14f, "x5.0", 10, CDim, TextAnchor.MiddleRight);
-            Txt("SpeedHint", _panel, 90f, -456f, PanelW - 180f, 14f, "拖动滑条", 10, CDim, TextAnchor.MiddleCenter);
+            Txt("SpeedMin", _panel, 16f, -540f, 60f, 14f, "x0.5", 10, CDim, TextAnchor.MiddleLeft);
+            Txt("SpeedMax", _panel, PanelW - 76f, -540f, 60f, 14f, "x5.0", 10, CDim, TextAnchor.MiddleRight);
+            Txt("SpeedHint", _panel, 90f, -540f, PanelW - 180f, 14f, "拖动滑条", 10, CDim, TextAnchor.MiddleCenter);
 
             // ---- resource amount ----
-            Txt("AmtLabel", _panel, 16f, -476f, 160f, 16f, "资源设定值", 11, CDim, TextAnchor.MiddleLeft);
+            Txt("AmtLabel", _panel, 16f, -560f, 160f, 16f, "资源设定值", 11, CDim, TextAnchor.MiddleLeft);
 
             int[] values = { 10000, 50000, 200000, 999999 };
             string[] names = { "10k", "50k", "200k", "999k" };
@@ -199,7 +202,7 @@ namespace CrossfireTrainer
             for (int i = 0; i < values.Length; i++)
             {
                 int v = values[i];
-                _amounts[i] = Small("Amt" + i, 16f + i * (aw + 4f), -492f, aw, 28f, names[i], CCard, CText, () =>
+                _amounts[i] = Small("Amt" + i, 16f + i * (aw + 4f), -576f, aw, 28f, names[i], CCard, CText, () =>
                 {
                     var p = TrainerPlugin.Instance;
                     p.State.Amount = v;
@@ -209,7 +212,7 @@ namespace CrossfireTrainer
             }
 
             // ---- action buttons ----
-            Small("Reset", 16f, -528f, (PanelW - 32f - 6f) / 2f, 28f, "重置速度", CCard, CText, () =>
+            Small("Reset", 16f, -612f, (PanelW - 32f - 6f) / 2f, 28f, "重置速度", CCard, CText, () =>
             {
                 var p = TrainerPlugin.Instance;
                 p.State.Speed = 1f;
@@ -218,7 +221,7 @@ namespace CrossfireTrainer
                 p.ShowToast("游戏速度重置为 x1.0");
             });
 
-            Small("Instant", 16f + (PanelW - 32f - 6f) / 2f + 6f, -528f, (PanelW - 32f - 6f) / 2f, 28f,
+            Small("Instant", 16f + (PanelW - 32f - 6f) / 2f + 6f, -612f, (PanelW - 32f - 6f) / 2f, 28f,
                   "立即完成建造", CCard, CText, () =>
                   {
                       var p = TrainerPlugin.Instance;
@@ -226,18 +229,18 @@ namespace CrossfireTrainer
                       p.ShowToast("立即完成建造");
                   });
 
-            Small("AllOff", 16f, -562f, PanelW - 32f, 26f, "关闭全部修改", new Color(0.55f, 0.18f, 0.16f, 0.85f), CText, () =>
+            Small("AllOff", 16f, -646f, PanelW - 32f, 26f, "关闭全部修改", new Color(0.55f, 0.18f, 0.16f, 0.85f), CText, () =>
             {
                 var p = TrainerPlugin.Instance;
                 p.State.Reset();
-                foreach (var k in new[] { "resources", "god", "build", "damage", "energy", "mana", "unitcd", "vision" })
+                foreach (var k in new[] { "resources", "god", "build", "damage", "energy", "mana", "unitcd", "vision", "movespeed", "popcap" })
                     p.SetFeature(k, false);
                 p.ApplySpeed();
                 p.PushSpeed();
                 p.ShowToast("已关闭全部修改");
             });
 
-            Txt("Footer", _panel, 16f, -602f, PanelW - 32f, 16f,
+            Txt("Footer", _panel, 16f, -686f, PanelW - 32f, 16f,
                 "F4 显示 / 隐藏面板      仅单人 · AI 遭遇战使用", 10, CDim, TextAnchor.MiddleLeft);
 
             // ---- toast ----
@@ -359,6 +362,8 @@ namespace CrossfireTrainer
             SetRow(5, _rowMana, p.State.Mana);
             SetRow(6, _rowUnitCd, p.State.UnitCd);
             SetRow(7, _rowVision, p.State.Vision);
+            SetRow(8, _rowMoveSpeed, p.State.MoveSpeed);
+            SetRow(9, _rowPopCap, p.State.PopCap);
 
             if (p.State.Amount != _lastAmount)
             {

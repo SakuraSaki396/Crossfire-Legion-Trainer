@@ -1,18 +1,29 @@
-# Crossfire Legion 修改器
+# Crossfire Legion 修改器 v2.0.0
 
-针对 Steam 游戏 **Crossfire: Legion (Demo)**（Unity + Carbon 引擎 + Mono）的单人修改器。
-以 **BepInEx 插件 + Lua 脚本扩展**实现，不硬改内存地址、不改游戏本体文件，卸载即恢复原版。
+针对 **Crossfire: Legion (Demo)**（Unity + Carbon 引擎 + Mono）的单人修改器安装器。
+**v2.0.0 是全新图形界面版本**，内置修改器本体仍是 **v1.16.3** 的 BepInEx 插件 + Lua 扩展（共 24 个文件），
+二者**功能一致，只是界面不同**。如本安装器用不了，可到 GitHub 下载 v1.16.3 版本。
+
+以 BepInEx 插件 + Lua 脚本扩展实现，不硬改内存地址、不改游戏本体文件，卸载即恢复原版。
+Steam / Epic / GOG / Xbox / 独立版安装均可使用。
 
 > ⚠️ **只在单人 / 离线 AI 遭遇战 / 战役里用。** 联机对局请勿开启；此类工具通常违反游戏服务条款，风险自负。
-> 本仓库不包含任何游戏文件，使用时需要你自备正版游戏。
+> 本软件不包含任何游戏文件，使用时需要你自备正版游戏。
 
-![安装器](docs/installer.png)
+## v2.0.0 更新内容
+
+1. 本安装器为 v2.0 版本，如用不了请到 github 上下载 v1.16.3 版本。二者功能一致，只是界面不同。
+2. 游戏内 F4 打开/关闭修改器面板。鼠标操作。
+3. 功能支持：资源修改 / 友方无敌 / 建造及生产加速 / 超级攻击力 / 能量无限 / 技能无冷却 / 全图视野 / 移动速度翻倍 / 一键 200 人口 / 游戏速度修改 / 一键完成建造 / 经验值修改 / 卡牌一键升级。
+
+相比 v1.16.3，安装器改为 WPF 图形界面（原创封面与图标）、**单文件自包含 exe**、
+逐文件 sha256 校验与失败自动回滚，并内置十章适配说明。
 
 ## 功能
 
 | 功能 | 说明 |
 |---|---|
-| 无限资源 | 每 0.5 秒把材料 / 燃料拉回设定值（10k / 50k / 200k / 999k 可切） |
+| 设定资源（不可逆） | 每 0.5 秒把材料 / 燃料拉回设定值（10k / 50k / 200k / 999k 可切）。**不可逆**：开启后原数值不会被保存，关闭开关也不会还原，只能重开一局或读档恢复 |
 | 友方无敌 / 锁血 | 对全部友方实体设 `IgnoreRemove` 交易模式，伤害无法扣除 HP / 护盾，每 1.5 秒刷新以覆盖新造单位 |
 | 建造 / 生产加速 | 复用官方 buff `ba_campaign_production_time_fast`（ConstructionRate ×50）与 `ba_Production_set_to_2`（生产 1 秒） |
 | 超级攻击力 | 官方 buff `ba_max_attack`，进入对局时把它的伤害值从自带的 1,000,000 改成 1,000（够秒任何单位，数值也不至于离谱） |
@@ -33,59 +44,62 @@
 
 ## 下载与安装
 
-1. 到 [Releases](../../releases) 下载最新的 `Crossfire Legion 修改器 vX.Y.Z.exe`（单文件，约 720 KB，只需系统自带的 .NET Framework 4.8）。
-2. 双击运行，它会自动找到 Steam 库里的游戏目录（找不到就点「浏览…」手动选，目录里应有 `Crossfire_Legion.exe`）。
-3. 点「安装 / 修复」，等它显示 `已安装 · 直接启动游戏即可`。
-4. 从 Steam 正常启动游戏，进入对局后按 `F4` 打开面板。
+1. 解压本 zip，得到 `Crossfire Legion 修改器v2.0.0.exe`（约 1 MB）。
+   **Win10 1809+ / Win11 自带 .NET Framework 4.8，不需要额外安装**；Win7 SP1 / 8.1 请先手动安装 .NET Framework 4.8，否则双击毫无反应。
+2. 双击运行，它会自动搜索常见安装位置（Steam 库 / Epic / GOG / Xbox / 自定义目录均可），
+   找不到就点「更改」手动选（目录里应有 `Crossfire_Legion.exe`，或有 Carbon 引擎的 `Data\Scripts` 布局）。
+   **不依赖 Steam 客户端、注册表、libraryfolders.vdf 或 appmanifest，也不校验 buildid。**
+3. 点「开始安装」，等它显示「修改器已安装」。
+4. 用你下载游戏的平台正常启动游戏，进入对局后按 `F4` 打开 / 隐藏面板。
 
-这个 exe 是**完全自包含**的：BepInEx 框架、插件 DLL、Lua 脚本（共 24 个文件）都内嵌在里面，
-所以可以把它单独存到 U 盘 / 网盘，游戏卸载重装后重新跑一次就能一键恢复。
+游戏正在运行时不能安装（`winhttp.dll` 会被占用），安装器会提示结束游戏后重试。
+提示没有写入权限时，右键 exe →「以管理员身份运行」。
+
+### 单文件，真的只有一个 exe
+
+config、封面、24 个修改器文件（共 32 项）都压进了 exe。启动时会：
+
+- exe 旁边**有** `Assets\`、`config\`、`payload\` → 直接用外面那份（方便离线排查 / 改配置）；
+- exe 旁边**没有** → 自动解压到 `%LOCALAPPDATA%\CFLTrainer\Runtime\v2.0.0\` 再从那里加载。
+
+所以只拷一个 exe 到 U 盘 / 网盘也能跑，游戏卸载重装后重新跑一次即可一键恢复。
+每次启动会重新解压，但 `config/ui.json` 在目标已存在时跳过覆盖，你选的深浅主题不会被重置。
 
 ### 适配说明就在 exe 里
 
-「游戏版本」卡片会读取游戏 exe 的 `ProductVersion` 与 Steam `buildid`，与验证过的版本比对，并对 14 项功能逐个自检；
-右上角 **「适配说明…」** 会弹出完整说明：适配的是哪个版本、版本对不上时**哪些功能会先失效**、日志里搜什么、更新后怎么办。
+右上角「**适配说明…**」弹出完整十章说明：适配的版本资料（仅供参考、不参与判定）、
+“版本对不上时哪些功能先失效”的属性 / 接口对照、日志关键字、四种失效表现、更新后怎么办、
+非 Steam 平台说明、安装前检查与排查步骤。点「复制全文」可把说明带走。
 
-![适配说明](docs/compat-note.png)
-
+安装器**只按目录结构 + 24 个文件的 sha256 判定**是否可安装；不读注册表 / appmanifest / buildid，
+不同平台的版本标识不同或读不到 buildid 都不算不兼容。游戏内 14 项功能自检看面板状态栏。
 这份说明只存在于 exe 内部，不会往游戏目录写任何说明文件。
 
-命令行模式（排查问题用）：
+命令行模式（排查用）：
 
 ```
-"Crossfire Legion 修改器 v1.16.1.exe" --detect            只检测并打印游戏路径
-"Crossfire Legion 修改器 v1.16.1.exe" --status            安装状态 + 版本判定
-"Crossfire Legion 修改器 v1.16.1.exe" --compat            打印完整适配说明
-"Crossfire Legion 修改器 v1.16.1.exe" --version           修改器版本与目标游戏版本
-"Crossfire Legion 修改器 v1.16.1.exe" --install [目录]    静默安装
-"Crossfire Legion 修改器 v1.16.1.exe" --uninstall [目录]  静默卸载
+"Crossfire Legion 修改器v2.0.0.exe" --detect     把目录发现结果写到 %TEMP%\cfl-trainer-detect.txt
+"Crossfire Legion 修改器v2.0.0.exe" --selftest   临时目录里跑安装 / 校验 / 回滚 / 卸载，结果写 selftest.log
+"Crossfire Legion 修改器v2.0.0.exe" --render     生成 7 张界面截图到 render\
 ```
 
-日志写在 `%TEMP%\CrossfireTrainerSetup.log`。
+`--selftest` 完全不碰真实游戏目录。本次发版结果：**RESULT: PASS**
+（24/24 文件校验通过、故意写坏哈希后回滚恢复 24/24、卸载残留 0）。
+单文件模式下 `selftest.log` 和 `render\` 写在 `%LOCALAPPDATA%\CFLTrainer\Runtime\v2.0.0\`；
+文件夹模式下写在 exe 旁边。安装器运行日志在 `%LOCALAPPDATA%\CFLTrainer\cfl-trainer-<时间>.log`。
 
-## 从源码构建
+## 卸载
 
-需要：Windows、[.NET SDK 8](https://dotnet.microsoft.com/download)、Python 3（打包脚本用）、
-以及一份**已安装的游戏**——编译插件要引用游戏自带的 `UnityEngine.*.dll` 与 `Carbon.*.dll`。
+双击 exe →「卸载修改器」→「确认卸载」。会：
 
-```
-git clone <this repo>
-cd <repo>
+- 删除安装时新增的 24 个文件；
+- 清掉 `BepInEx\` 运行时目录（日志、经验钱包、缓存等清单外的产物）、
+  `.cfl-trainer-state.json` 和 `.cfl-trainer-backup\` 备份目录。
 
-# 1) 编译插件并部署到游戏目录（dll + lua）
-cd CrossfireTrainer
-set CFL_GAME_DIR=D:\SteamLibrary\steamapps\common\Crossfire Legion (Demo)
-build.bat
+游戏本体不受影响。通过平台的「验证 / 修复游戏文件」也能恢复 Lua 部分。
 
-# 2) 打包成单文件安装器，导出到仓库根目录
-cd ..\TrainerSetup
-build_setup.bat
-```
-
-也可以把游戏目录直接当参数传：`build.bat "D:\...\Crossfire Legion (Demo)"`。
-`build_setup.bat` 的 payload 是**从游戏目录里收集**部署好的文件（含 `BepInEx\core`），
-所以第一次构建前，游戏目录里需要已经有一份 BepInEx 5.4.23.2（x64）——
-先跑一次已发布的安装器，或按 BepInEx 官方文档自行安装即可。
+> 如果游戏目录里还装着**旧版单文件安装器**放过的修改器，直接用本安装器点「开始安装」即可，
+> 不需要先卸旧的：这 24 个文件全是修改器新增的，安装不做备份，卸载也会直接删干净。
 
 ## 实现原理
 
@@ -107,20 +121,18 @@ build_setup.bat
 - 所有功能只作用于**本地玩家**一方，不碰 AI。
 - 游戏大版本更新后，属性资源名或脚本接口可能变化；安装器与面板自检会提示是哪一项失效。
 
-## 卸载
-
-双击安装器 → 点「卸载」，会删掉 `BepInEx\`、`winhttp.dll`、`doorstop_config.ini`、`.doorstop_version`、
-`Data\Scripts\Source\Extensions\zzz_trainer.lua`，游戏本体不受影响。
-Steam「验证文件完整性」也能恢复 Lua 部分。
-
 ## 常见问题
 
 - **游戏里不出现面板**：先看 `游戏目录\BepInEx\LogOutput.log`。
-  没有这个文件 = 注入没生效，重新跑一次安装器；杀毒软件有时会把 `winhttp.dll`（Doorstop 注入器）当木马清掉，
+  没有这个文件 = 注入没生效，重新点一次安装；杀毒软件有时会把 `winhttp.dll`（Doorstop 注入器）当木马清掉，
   给游戏目录加白名单后重装即可。
 - **面板出来了但某项没反应**：安装器里点「适配说明…」，对照里面列出的第 2、3、4 类原因，
-  或把 `LogOutput.log` 里 `compat:` / `assets missing:` 两行贴到 Issue。
+  或把 `LogOutput.log` 里 `compat:` / `assets missing:` 两行发给作者。
+- **游戏更新后**：先正常启动一次看面板是否出现；没出现就重新跑安装器；
+  出现了但个别无效，把日志里 `compat:` / `assets missing:` 两行发来按日志补。
 - **提示没有写入权限**：右键 exe →「以管理员身份运行」。
+- **经验钱包**：`BepInEx\config\CrossfireTrainer.xp.txt` 是本地插件文件，**不在 Steam 账号同步范围**；
+  卡牌等级、经验统计项和战役进度由游戏在线统计服务同步，卸载游戏后不会丢。
 
 ## 许可
 

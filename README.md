@@ -1,7 +1,7 @@
-# Crossfire Legion 修改器 v2.0.0
+# Crossfire Legion 修改器 v2.1.0
 
 针对 **Crossfire: Legion (Demo)**（Unity + Carbon 引擎 + Mono）的单人修改器安装器。
-**v2.0.0 是全新图形界面版本**，内置修改器本体仍是 **v1.16.3** 的 BepInEx 插件 + Lua 扩展（共 24 个文件），
+**v2.1.0 是全新图形界面版本**，内置修改器本体仍是 **v1.16.3** 的 BepInEx 插件 + Lua 扩展（共 24 个文件），
 二者**功能一致，只是界面不同**。如本安装器用不了，可到 GitHub 下载 v1.16.3 版本。
 
 以 BepInEx 插件 + Lua 脚本扩展实现，不硬改内存地址、不改游戏本体文件，卸载即恢复原版。
@@ -10,14 +10,17 @@ Steam / Epic / GOG / Xbox / 独立版安装均可使用。
 > ⚠️ **只在单人 / 离线 AI 遭遇战 / 战役里用。** 联机对局请勿开启；此类工具通常违反游戏服务条款，风险自负。
 > 本软件不包含任何游戏文件，使用时需要你自备正版游戏。
 
-## v2.0.0 更新内容
+## v2.1.0 更新内容
 
-1. 本安装器为 v2.0 版本，如用不了请到 github 上下载 v1.16.3 版本。二者功能一致，只是界面不同。
+1. 本安装器为 v2.1 版本，如用不了请到 github 上下载 v1.16.3 版本。二者功能一致，只是界面不同。
 2. 游戏内 F4 打开/关闭修改器面板。鼠标操作。
 3. 功能支持：资源修改 / 友方无敌 / 建造及生产加速 / 超级攻击力 / 能量无限 / 技能无冷却 / 全图视野 / 移动速度翻倍 / 一键 200 人口 / 游戏速度修改 / 一键完成建造 / 经验值修改 / 卡牌一键升级。
 
 相比 v1.16.3，安装器改为 WPF 图形界面（原创封面与图标）、**单文件自包含 exe**、
 逐文件 sha256 校验与失败自动回滚，并内置十章适配说明。
+
+v2.1.0 新增：**安装器窗口分辨率自适应**。窗口会按屏幕可用区域（排除任务栏）自动算尺寸，
+保持设计比例等比缩放，小屏不裁切、大屏不铺满，4K 与 125% 缩放下文字都完整清晰。
 
 ## 功能
 
@@ -44,7 +47,7 @@ Steam / Epic / GOG / Xbox / 独立版安装均可使用。
 
 ## 下载与安装
 
-1. 解压本 zip，得到 `Crossfire Legion 修改器v2.0.0.exe`（约 1 MB）。
+1. 解压本 zip，得到 `Crossfire Legion 修改器v2.1.0.exe`（约 1 MB）。
    **Win10 1809+ / Win11 自带 .NET Framework 4.8，不需要额外安装**；Win7 SP1 / 8.1 请先手动安装 .NET Framework 4.8，否则双击毫无反应。
 2. 双击运行，它会自动搜索常见安装位置（Steam 库 / Epic / GOG / Xbox / 自定义目录均可），
    找不到就点「更改」手动选（目录里应有 `Crossfire_Legion.exe`，或有 Carbon 引擎的 `Data\Scripts` 布局）。
@@ -60,7 +63,7 @@ Steam / Epic / GOG / Xbox / 独立版安装均可使用。
 config、封面、24 个修改器文件（共 32 项）都压进了 exe。启动时会：
 
 - exe 旁边**有** `Assets\`、`config\`、`payload\` → 直接用外面那份（方便离线排查 / 改配置）；
-- exe 旁边**没有** → 自动解压到 `%LOCALAPPDATA%\CFLTrainer\Runtime\v2.0.0\` 再从那里加载。
+- exe 旁边**没有** → 自动解压到 `%LOCALAPPDATA%\CFLTrainer\Runtime\v2.1.0\` 再从那里加载。
 
 所以只拷一个 exe 到 U 盘 / 网盘也能跑，游戏卸载重装后重新跑一次即可一键恢复。
 每次启动会重新解压，但 `config/ui.json` 在目标已存在时跳过覆盖，你选的深浅主题不会被重置。
@@ -78,14 +81,14 @@ config、封面、24 个修改器文件（共 32 项）都压进了 exe。启动
 命令行模式（排查用）：
 
 ```
-"Crossfire Legion 修改器v2.0.0.exe" --detect     把目录发现结果写到 %TEMP%\cfl-trainer-detect.txt
-"Crossfire Legion 修改器v2.0.0.exe" --selftest   临时目录里跑安装 / 校验 / 回滚 / 卸载，结果写 selftest.log
-"Crossfire Legion 修改器v2.0.0.exe" --render     生成 7 张界面截图到 render\
+"Crossfire Legion 修改器v2.1.0.exe" --detect     把目录发现结果写到 %TEMP%\cfl-trainer-detect.txt
+"Crossfire Legion 修改器v2.1.0.exe" --selftest   临时目录里跑安装 / 校验 / 回滚 / 卸载，结果写 selftest.log
+"Crossfire Legion 修改器v2.1.0.exe" --render     生成 7 张界面截图到 render\
 ```
 
 `--selftest` 完全不碰真实游戏目录。本次发版结果：**RESULT: PASS**
 （24/24 文件校验通过、故意写坏哈希后回滚恢复 24/24、卸载残留 0）。
-单文件模式下 `selftest.log` 和 `render\` 写在 `%LOCALAPPDATA%\CFLTrainer\Runtime\v2.0.0\`；
+单文件模式下 `selftest.log` 和 `render\` 写在 `%LOCALAPPDATA%\CFLTrainer\Runtime\v2.1.0\`；
 文件夹模式下写在 exe 旁边。安装器运行日志在 `%LOCALAPPDATA%\CFLTrainer\cfl-trainer-<时间>.log`。
 
 ## 卸载
